@@ -1,3 +1,5 @@
+# main.py
+
 import argparse
 import os
 import torch
@@ -40,11 +42,11 @@ def evaluate(model, dataloader, criterion, device):
             loss = criterion(outputs, labels)
             running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
-            correct += torch.sum(preds == labels.data)
+            correct += torch.sum(preds == labels.data).item()
             total += labels.size(0)
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
-    accuracy = correct.double() / total
+    accuracy = correct / total
     f1 = f1_score(y_true, y_pred, average='weighted')
     precision = precision_score(y_true, y_pred, average='weighted')
     recall = recall_score(y_true, y_pred, average='weighted')
@@ -86,10 +88,15 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the dataset
-    train_dataset = SatelliteDataset(args.data_dir, "train", args.bands)
-    val_dataset = SatelliteDataset(args.data_dir, "val", args.bands)
+    train_dataset = SatelliteDataset(args.data_dir, "train", args.bands, val_size=0.2, random_state=42)
+    val_dataset = SatelliteDataset(args.data_dir, "val", args.bands, val_size=0.2, random_state=42)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
+
+    for inputs, labels in train_loader:
+        print(f"Input tensor shape: {inputs.shape}")
+        print(f"Labels shape: {labels.shape}")
+        break
 
     # Create the model
     if args.model == "vit":
@@ -99,7 +106,7 @@ def main(args):
     elif args.model == "convnext":
         model = ConvNeXt(num_classes=args.num_classes, num_channels=len(args.bands))
     elif args.model == "resnet50":
-        model = ResNet50(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = ResNet50(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "densenet121":
         model = DenseNet121(num_classes=args.num_classes, num_channels=len(args.bands))
     elif args.model == "densenet169":
@@ -174,9 +181,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Satellite Image Classification")
     parser.add_argument("--data_dir", type=str, default="data", help="Directory containing the dataset")
     parser.add_argument("--bands", type=str, default="0,1,2", help="Comma-separated list of bands to use for training")
-    parser.add_argument("--model", type=str, default="vit", help="Model architecture")
+    parser.add_argument("--model", type=str, default="resnet50", help="Model architecture")
     parser.add_argument("--num_classes", type=int, default=2, help="Number of classes")
-    parser.add_argument("--image_size", type=int, default=224, help="Input image size")
+    parser.add_argument("--image_size", type=int, default=500, help="Input image size")
     parser.add_argument("--patch_size", type=int, default=16, help="Patch size for Vision Transformer")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")

@@ -28,8 +28,13 @@ def train(model, dataloader, criterion, optimizer, device):
         running_loss += loss.item() * inputs.size(0)
     return running_loss / len(dataloader.dataset)
 
-def evaluate(model, dataloader, criterion, device):
+def evaluate(model, val_loader, test_loader, criterion, device):
     model.eval()
+    val_loss, val_acc, val_f1, val_precision, val_recall = _evaluate_set(model, val_loader, criterion, device)
+    test_loss, test_acc, test_f1, test_precision, test_recall = _evaluate_set(model, test_loader, criterion, device)
+    return val_loss, val_acc, val_f1, val_precision, val_recall, test_loss, test_acc, test_f1, test_precision, test_recall
+
+def _evaluate_set(model, dataloader, criterion, device):
     running_loss = 0.0
     correct = 0
     total = 0
@@ -46,38 +51,56 @@ def evaluate(model, dataloader, criterion, device):
             total += labels.size(0)
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
-    accuracy = correct / total
-    f1 = f1_score(y_true, y_pred, average='weighted')
-    precision = precision_score(y_true, y_pred, average='weighted')
-    recall = recall_score(y_true, y_pred, average='weighted')
+    accuracy = correct / total if total != 0 else 0.0
+    f1 = f1_score(y_true, y_pred, average='weighted', zero_division=1)
+    precision = precision_score(y_true, y_pred, average='weighted', zero_division=1)
+    recall = recall_score(y_true, y_pred, average='weighted', zero_division=1)
     return running_loss / len(dataloader.dataset), accuracy, f1, precision, recall
 
-def plot_metrics(train_losses, val_losses, val_accuracies, val_f1_scores, val_precisions, val_recalls, output_dir):
+def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies, val_f1_scores, test_f1_scores,
+                 val_precisions, test_precisions, val_recalls, test_recalls, output_dir):
     epochs = range(1, len(train_losses) + 1)
 
-    plt.figure(figsize=(12, 8))
-    plt.subplot(2, 2, 1)
+    plt.figure(figsize=(16, 12))
+    plt.subplot(2, 3, 1)
     plt.plot(epochs, train_losses, 'b', label='Training Loss')
     plt.plot(epochs, val_losses, 'r', label='Validation Loss')
-    plt.title('Training and Validation Loss')
+    plt.plot(epochs, test_losses, 'g', label='Testing Loss')
+    plt.title('Training, Validation and Testing Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
 
-    plt.subplot(2, 2, 2)
-    plt.plot(epochs, val_accuracies, 'b', label='Validation Accuracy')
-    plt.title('Validation Accuracy')
+    plt.subplot(2, 3, 2)
+    plt.plot(epochs, val_accuracies, 'r', label='Validation Accuracy')
+    plt.plot(epochs, test_accuracies, 'g', label='Testing Accuracy')
+    plt.title('Validation and Testing Accuracy')
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
     plt.legend()
 
-    plt.subplot(2, 2, 3)
-    plt.plot(epochs, val_f1_scores, 'b', label='Validation F1 Score')
-    plt.plot(epochs, val_precisions, 'g', label='Validation Precision')
-    plt.plot(epochs, val_recalls, 'r', label='Validation Recall')
-    plt.title('Validation F1 Score, Precision, and Recall')
+    plt.subplot(2, 3, 3)
+    plt.plot(epochs, val_f1_scores, 'r', label='Validation F1 Score')
+    plt.plot(epochs, test_f1_scores, 'g', label='Testing F1 Score')
+    plt.title('Validation and Testing F1 Score')
     plt.xlabel('Epochs')
-    plt.ylabel('Score')
+    plt.ylabel('F1 Score')
+    plt.legend()
+
+    plt.subplot(2, 3, 4)
+    plt.plot(epochs, val_precisions, 'r', label='Validation Precision')
+    plt.plot(epochs, test_precisions, 'g', label='Testing Precision')
+    plt.title('Validation and Testing Precision')
+    plt.xlabel('Epochs')
+    plt.ylabel('Precision')
+    plt.legend()
+
+    plt.subplot(2, 3, 5)
+    plt.plot(epochs, val_recalls, 'r', label='Validation Recall')
+    plt.plot(epochs, test_recalls, 'g', label='Testing Recall')
+    plt.title('Validation and Testing Recall')
+    plt.xlabel('Epochs')
+    plt.ylabel('Recall')
     plt.legend()
 
     plt.tight_layout()
@@ -88,35 +111,32 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load the dataset
-    train_dataset = SatelliteDataset(args.data_dir, "train", args.bands, val_size=0.2, random_state=42)
-    val_dataset = SatelliteDataset(args.data_dir, "val", args.bands, val_size=0.2, random_state=42)
+    train_dataset = SatelliteDataset(args.data_dir, "train", args.bands, val_size=0.2, test_size=0.1, random_state=42)
+    val_dataset = SatelliteDataset(args.data_dir, "val", args.bands, val_size=0.2, test_size=0.1, random_state=42)
+    test_dataset = SatelliteDataset(args.data_dir, "test", args.bands, val_size=0.2, test_size=0.1, random_state=42)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
-
-    for inputs, labels in train_loader:
-        print(f"Input tensor shape: {inputs.shape}")
-        print(f"Labels shape: {labels.shape}")
-        break
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size)
 
     # Create the model
     if args.model == "vit":
-        model = VisionTransformer(num_classes=args.num_classes, num_channels=len(args.bands), image_size=args.image_size, patch_size=args.patch_size)
+        model = VisionTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), image_size=args.image_size, patch_size=args.patch_size)
     elif args.model == "swin":
-        model = SwinTransformer(num_classes=args.num_classes, num_channels=len(args.bands), image_size=args.image_size, patch_size=args.patch_size)
+        model = SwinTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), image_size=args.image_size, patch_size=args.patch_size)
     elif args.model == "convnext":
-        model = ConvNeXt(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = ConvNeXt(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "resnet50":
         model = ResNet50(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "densenet121":
-        model = DenseNet121(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = DenseNet121(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "densenet169":
-        model = DenseNet169(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = DenseNet169(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "densenet201":
-        model = DenseNet201(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = DenseNet201(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "efficientnet_b0":
-        model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "efficientnet_b7":
-        model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands))
+        model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)
@@ -132,32 +152,47 @@ def main(args):
 
     train_losses = []
     val_losses = []
+    test_losses = []
     val_accuracies = []
+    test_accuracies = []
     val_f1_scores = []
+    test_f1_scores = []
     val_precisions = []
+    test_precisions = []
     val_recalls = []
+    test_recalls = []
 
     # Train the model
     for epoch in range(args.epochs):
         train_loss = train(model, train_loader, criterion, optimizer, device)
-        val_loss, val_acc, val_f1, val_precision, val_recall = evaluate(model, val_loader, criterion, device)
+        val_loss, val_acc, val_f1, val_precision, val_recall, test_loss, test_acc, test_f1, test_precision, test_recall = evaluate(model, val_loader, test_loader, criterion, device)
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
+        test_losses.append(test_loss)
         val_accuracies.append(val_acc)
+        test_accuracies.append(test_acc)
         val_f1_scores.append(val_f1)
+        test_f1_scores.append(test_f1)
         val_precisions.append(val_precision)
+        test_precisions.append(test_precision)
         val_recalls.append(val_recall)
+        test_recalls.append(test_recall)
 
-        print(f"Epoch [{epoch+1}/{args.epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}, Val Precision: {val_precision:.4f}, Val Recall: {val_recall:.4f}")
+        print(f"Epoch [{epoch+1}/{args.epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Test Loss: {test_loss:.4f}, Val Acc: {val_acc:.4f}, Test Acc: {test_acc:.4f}, Val F1: {val_f1:.4f}, Test F1: {test_f1:.4f}, Val Precision: {val_precision:.4f}, Test Precision: {test_precision:.4f}, Val Recall: {val_recall:.4f}, Test Recall: {test_recall:.4f}")
 
         # Record metrics in TensorBoard
         writer.add_scalar("Loss/Train", train_loss, epoch)
         writer.add_scalar("Loss/Validation", val_loss, epoch)
+        writer.add_scalar("Loss/Test", test_loss, epoch)
         writer.add_scalar("Accuracy/Validation", val_acc, epoch)
+        writer.add_scalar("Accuracy/Test", test_acc, epoch)
         writer.add_scalar("F1 Score/Validation", val_f1, epoch)
+        writer.add_scalar("F1 Score/Test", test_f1, epoch)
         writer.add_scalar("Precision/Validation", val_precision, epoch)
+        writer.add_scalar("Precision/Test", test_precision, epoch)
         writer.add_scalar("Recall/Validation", val_recall, epoch)
+        writer.add_scalar("Recall/Test", test_recall, epoch)
 
         # Save model every 10 epochs
         if (epoch + 1) % 10 == 0:
@@ -165,14 +200,18 @@ def main(args):
             torch.save(model.state_dict(), os.path.join(args.output_dir, model_name))
 
             # Plot metrics every 10 epochs
-            plot_metrics(train_losses, val_losses, val_accuracies, val_f1_scores, val_precisions, val_recalls, args.output_dir)
+            plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies,
+                         val_f1_scores, test_f1_scores, val_precisions, test_precisions,
+                         val_recalls, test_recalls, args.output_dir)
 
     # Save the final model
     model_name = f"{args.model}_final_bands{'_'.join(map(str, args.bands))}_lr{args.learning_rate}_batchsize{args.batch_size}.pth"
     torch.save(model.state_dict(), os.path.join(args.output_dir, model_name))
 
     # Plot the final metrics
-    plot_metrics(train_losses, val_losses, val_accuracies, val_f1_scores, val_precisions, val_recalls, args.output_dir)
+    plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies,
+                 val_f1_scores, test_f1_scores, val_precisions, test_precisions,
+                 val_recalls, test_recalls, args.output_dir)
 
     # Close TensorBoard writer
     writer.close()

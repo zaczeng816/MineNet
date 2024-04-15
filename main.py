@@ -120,9 +120,9 @@ def main(args):
 
     # Create the model
     if args.model == "vit":
-        model = VisionTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), image_size=args.image_size, patch_size=args.patch_size)
+        model = VisionTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "swin":
-        model = SwinTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")), image_size=args.image_size, patch_size=args.patch_size)
+        model = SwinTransformer(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "convnext":
         model = ConvNeXt(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "resnet50":
@@ -205,7 +205,7 @@ def main(args):
                          val_recalls, test_recalls, args.output_dir)
 
     # Save the final model
-    model_name = f"{args.model}_final_bands{'_'.join(map(str, args.bands))}_lr{args.learning_rate}_batchsize{args.batch_size}.pth"
+    model_name = f"{args.model}_final_bands{'_'.join(args.bands.split(','))}_lr{args.learning_rate}_batchsize{args.batch_size}.pth"
     torch.save(model.state_dict(), os.path.join(args.output_dir, model_name))
 
     # Plot the final metrics

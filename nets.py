@@ -1,30 +1,36 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, densenet121, densenet169, densenet201, efficientnet_b0, efficientnet_b7
+from torchvision.models import resnet50, densenet121, densenet169, densenet201, efficientnet_b0, efficientnet_b7, vit_b_16, swin_t, convnext_tiny
 
 class VisionTransformer(nn.Module):
-    def __init__(self, num_classes, num_channels, image_size, patch_size):
+    def __init__(self, num_classes, num_channels):
         super(VisionTransformer, self).__init__()
-        pass
+        self.model = vit_b_16(weights=None, image_size=512)
+        self.model.conv_proj = nn.Conv2d(num_channels, 768, kernel_size=16, stride=16)
+        self.model.heads = nn.Linear(768, num_classes)
 
     def forward(self, x):
-        pass
+        return self.model(x)
 
 class SwinTransformer(nn.Module):
-    def __init__(self, num_classes, num_channels, image_size, patch_size):
+    def __init__(self, num_classes, num_channels):
         super(SwinTransformer, self).__init__()
-        pass
+        self.model = swin_t(weights=None)
+        self.model.features[0][0] = nn.Conv2d(num_channels, 96, kernel_size=4, stride=4)
+        self.model.head = nn.Linear(768, num_classes)
 
     def forward(self, x):
-        pass
+        return self.model(x)
 
 class ConvNeXt(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(ConvNeXt, self).__init__()
-        pass
+        self.model = convnext_tiny(weights=None)
+        self.model.features[0][0] = nn.Conv2d(num_channels, 96, kernel_size=4, stride=4)
+        self.model.classifier[2] = nn.Linear(768, num_classes)
 
     def forward(self, x):
-        pass
+        return self.model(x)
 
 class ResNet50(nn.Module):
     def __init__(self, num_classes, num_channels):

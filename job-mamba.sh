@@ -16,15 +16,10 @@ singularity exec --nv \
   /scratch/work/public/singularity/cuda11.8.86-cudnn8.7-devel-ubuntu22.04.2.sif \
   /bin/bash -c "source /scratch/wz1492/env.sh;"
 
-# Define hyperparameter combinations
-models=("resnet50" "efficientnet_b0" "densenet121" "vit" "swin")
+# the envroment to run mamba
+conda activate Vim
 
 
 
-# Iterate over hyperparameter combinations
-for model in "${models[@]}"; do
-  run_name="${model}_epochs${num_epoch}"
-  echo "Running: $run_name"
-
-  python main.py --model "$model" --epochs 100 --bands "0,1,2,3,4,5,6,7,8,9,10,11"
-done
+python main.py --model mamba --epochs 100 --bands "0,1,2,3,4,5,6,7,8,9,10,11"
+python main.py --model mamba --epochs 100 --bands "0,1,2"

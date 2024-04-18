@@ -1,5 +1,4 @@
 # main.py
-
 import argparse
 import os
 import torch
@@ -10,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from load_dataset import SatelliteDataset
 from nets import (
     VisionTransformer, SwinTransformer, ConvNeXt, ResNet50, DenseNet121, DenseNet169,
-    DenseNet201, EfficientNetB0, EfficientNetB7
+    DenseNet201, EfficientNetB0, EfficientNetB7,VisionMambaNet
 )
 from sklearn.metrics import f1_score, precision_score, recall_score
 import matplotlib.pyplot as plt
@@ -22,7 +21,11 @@ def train(model, dataloader, criterion, optimizer, device):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        
+        # Apply one-hot encoding to the labels
+        one_hot_labels = nn.functional.one_hot(labels, num_classes=args.num_classes).float()
+        
+        loss = criterion(outputs, one_hot_labels)
         loss.backward()
         optimizer.step()
         running_loss += loss.item() * inputs.size(0)
@@ -44,7 +47,11 @@ def _evaluate_set(model, dataloader, criterion, device):
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            
+            # Apply one-hot encoding to the labels
+            one_hot_labels = nn.functional.one_hot(labels, num_classes=args.num_classes).float()
+            
+            loss = criterion(outputs, one_hot_labels)
             running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
             correct += torch.sum(preds == labels.data).item()
@@ -104,11 +111,20 @@ def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_acc
     plt.legend()
 
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'metrics_plot.png'))
+    plt.savefig(os.path.join(output_dir, f'metrics_plot_{args.model}.png'))
     plt.close()
-
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Create a unique subdirectory for each run
+    run_dir = os.path.join(args.output_dir, f"{args.model}_bands{'_'.join(args.bands.split(','))}_lr{args.learning_rate}_batchsize{args.batch_size}")
+    os.makedirs(run_dir, exist_ok=True)
+
+    # Create subdirectories for TensorBoard logs and model checkpoints
+    tensorboard_dir = os.path.join(run_dir, "tensorboard")
+    os.makedirs(tensorboard_dir, exist_ok=True)
+    model_dir = os.path.join(run_dir, "models")
+    os.makedirs(model_dir, exist_ok=True)
 
     # Load the dataset
     train_dataset = SatelliteDataset(args.data_dir, "train", args.bands, val_size=0.2, test_size=0.1, random_state=42)
@@ -137,18 +153,17 @@ def main(args):
         model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "efficientnet_b7":
         model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+    elif args.model == "mamba":
+        model = VisionMambaNet(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # Create TensorBoard writer
-    writer = SummaryWriter(log_dir=args.output_dir)
-
-    # Create output directory for saving models and plots
-    os.makedirs(args.output_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=tensorboard_dir)
 
     train_losses = []
     val_losses = []
@@ -197,21 +212,21 @@ def main(args):
         # Save model every 10 epochs
         if (epoch + 1) % 10 == 0:
             model_name = f"{args.model}_epoch{epoch+1}_bands{'_'.join(map(str, args.bands))}_lr{args.learning_rate}_batchsize{args.batch_size}.pth"
-            torch.save(model.state_dict(), os.path.join(args.output_dir, model_name))
+            torch.save(model.state_dict(), os.path.join(model_dir, model_name))
 
             # Plot metrics every 10 epochs
             plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies,
                          val_f1_scores, test_f1_scores, val_precisions, test_precisions,
-                         val_recalls, test_recalls, args.output_dir)
+                         val_recalls, test_recalls, run_dir)
 
     # Save the final model
     model_name = f"{args.model}_final_bands{'_'.join(args.bands.split(','))}_lr{args.learning_rate}_batchsize{args.batch_size}.pth"
-    torch.save(model.state_dict(), os.path.join(args.output_dir, model_name))
+    torch.save(model.state_dict(), os.path.join(model_dir, model_name))
 
     # Plot the final metrics
     plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies,
                  val_f1_scores, test_f1_scores, val_precisions, test_precisions,
-                 val_recalls, test_recalls, args.output_dir)
+                 val_recalls, test_recalls, run_dir)
 
     # Close TensorBoard writer
     writer.close()
@@ -225,7 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--image_size", type=int, default=500, help="Input image size")
     parser.add_argument("--patch_size", type=int, default=16, help="Patch size for Vision Transformer")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--learning_rate", type=float, default=0.0005, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
     parser.add_argument("--output_dir", type=str, default="results", help="Directory to save the trained models and plots")
     args = parser.parse_args()

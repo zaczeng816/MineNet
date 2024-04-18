@@ -70,6 +70,7 @@ class ResNet50(nn.Module):
         self.model.conv1 = nn.Conv2d(num_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, num_classes)
+        
 
     def forward(self, x):
         return self.model(x)

@@ -17,7 +17,9 @@ singularity exec --nv \
   /bin/bash -c "source /scratch/wz1492/env.sh;"
 
 # Define hyperparameter combinations
-models=("resnet50" "efficientnet_b0" "densenet121" "vit" "swin")
+source /scratch/wz1492/miniconda3/etc/profile.d/conda.sh
+/scratch/wz1492/miniconda3/bin/conda activate Vim
+models=( "vit" "swin")
 
 
 
@@ -26,5 +28,6 @@ for model in "${models[@]}"; do
   run_name="${model}_epochs${num_epoch}"
   echo "Running: $run_name"
 
-  python main.py --model "$model" --epochs 100 --bands "0,1,2,3,4,5,6,7,8,9,10,11"
+  python main.py --model "$model" --epochs 30 --bands "0,1,2,3,4,5,6,7,8,9,10,11"
+  python main.py --model "$model" --epochs 30 --bands "0,1,2"
 done

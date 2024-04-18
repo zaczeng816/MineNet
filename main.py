@@ -21,11 +21,7 @@ def train(model, dataloader, criterion, optimizer, device):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        
-        # Apply one-hot encoding to the labels
-        one_hot_labels = nn.functional.one_hot(labels, num_classes=args.num_classes).float()
-        
-        loss = criterion(outputs, one_hot_labels)
+        loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
         running_loss += loss.item() * inputs.size(0)
@@ -47,11 +43,7 @@ def _evaluate_set(model, dataloader, criterion, device):
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
-            
-            # Apply one-hot encoding to the labels
-            one_hot_labels = nn.functional.one_hot(labels, num_classes=args.num_classes).float()
-            
-            loss = criterion(outputs, one_hot_labels)
+            loss = criterion(outputs, labels)
             running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
             correct += torch.sum(preds == labels.data).item()
@@ -159,7 +151,7 @@ def main(args):
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)
 
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
     # Create TensorBoard writer
@@ -237,11 +229,11 @@ if __name__ == "__main__":
     parser.add_argument("--bands", type=str, default="0,1,2", help="Comma-separated list of bands to use for training")
     parser.add_argument("--model", type=str, default="resnet50", help="Model architecture")
     parser.add_argument("--num_classes", type=int, default=2, help="Number of classes")
-    parser.add_argument("--image_size", type=int, default=500, help="Input image size")
+    parser.add_argument("--image_size", type=int, default=512, help="Input image size")
     parser.add_argument("--patch_size", type=int, default=16, help="Patch size for Vision Transformer")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    parser.add_argument("--learning_rate", type=float, default=0.0005, help="Learning rate")
-    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs")
+    parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")
+    parser.add_argument("--epochs", type=int, default=25, help="Number of epochs")
     parser.add_argument("--output_dir", type=str, default="results", help="Directory to save the trained models and plots")
     args = parser.parse_args()
     main(args)

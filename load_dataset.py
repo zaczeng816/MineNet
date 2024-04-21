@@ -55,20 +55,20 @@ class SatelliteDataset(Dataset):
     def _get_transform(self):
         if self.split == "train":
             transform = transforms.Compose([
+                transforms.Resize((224, 224)),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip()
             ])
         else:
-            transform = transforms.Compose([])
+            transform = transforms.Compose([
+                transforms.Resize((224, 224))
+            ])
         return transform
-
     def __getitem__(self, index):
         image_file = self.image_files[index]
         label = self.labels[index]
 
         image = tiff.imread(image_file)
-        assert image.shape == (512, 512, 12), f"Expected shape (512, 512, 12), but got {image.shape}"
-
         selected_bands = image[:, :, self.bands]  # Select the desired bands
         selected_bands = selected_bands.astype(np.float32) / 65535.0  # Normalize to [0, 1]
         selected_bands = np.transpose(selected_bands, (2, 0, 1))  # Change to (C, H, W) format

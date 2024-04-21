@@ -109,7 +109,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create a unique subdirectory for each run
-    run_dir = os.path.join(args.output_dir, f"{args.model}_bands{'_'.join(args.bands.split(','))}_lr{args.learning_rate}_batchsize{args.batch_size}")
+    run_dir = os.path.join(args.output_dir, f"{args.model}_bands{'_'.join(args.bands.split(','))}_lr{args.learning_rate}_batchsize{args.batch_size}_optimizer{args.optimizer}")
     os.makedirs(run_dir, exist_ok=True)
 
     # Create subdirectories for TensorBoard logs and model checkpoints
@@ -147,13 +147,24 @@ def main(args):
         model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "mamba":
         model = VisionMambaNet(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+    elif args.model == "vit_l":
+        model = VisionTransformer_Large(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    class_weights = torch.tensor([2.0, 1.0]).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
 
+    if args.optimizer == "sgd":
+        optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=0.0001)
+    elif args.optimizer == "adam":
+        optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=0.0001)
+    elif args.optimizer == "rmsprop":
+        optimizer = optim.RMSprop(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=0.0001)
+    else:
+        raise ValueError(f"Unsupported optimizer: {args.optimizer}")
+    
     # Create TensorBoard writer
     writer = SummaryWriter(log_dir=tensorboard_dir)
 
@@ -234,6 +245,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=25, help="Number of epochs")
+    parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer to use (sgd, adam, rmsprop)")
     parser.add_argument("--output_dir", type=str, default="results", help="Directory to save the trained models and plots")
     args = parser.parse_args()
     main(args)

@@ -16,10 +16,10 @@ singularity exec --nv \
   /scratch/work/public/singularity/cuda11.8.86-cudnn8.7-devel-ubuntu22.04.2.sif \
   /bin/bash -c "source /scratch/wz1492/env.sh;"
 
-# Define hyperparameter combinations
 source /scratch/wz1492/miniconda3/etc/profile.d/conda.sh
-/scratch/wz1492/miniconda3/bin/conda activate Vim
-models=( "vit" "swin")
+conda activate Vim
+
+models=( "resnet50" "densenet121" "efficientnet_b0" "vit" "swin" "mamba" )
 
 
 
@@ -28,6 +28,7 @@ for model in "${models[@]}"; do
   run_name="${model}_epochs${num_epoch}"
   echo "Running: $run_name"
 
-  python main.py --model "$model" --epochs 30 --bands "0,1,2,3,4,5,6,7,8,9,10,11"
-  python main.py --model "$model" --epochs 30 --bands "0,1,2"
+  python main.py --model "$model" --epochs 80 --bands "0,1,2,3,4,5,6,7,8,9,10,11" 
+  python main.py --model "$model" --epochs 80 --bands "0,1,2" 
 done
+

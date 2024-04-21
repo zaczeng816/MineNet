@@ -36,17 +36,18 @@ class VisionMambaNet(nn.Module):
 class VisionTransformer(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(VisionTransformer, self).__init__()
-        self.model = vit_b_16(weights=None, image_size=512)
+        self.model = vit_b_16(weights=True, image_size=224)
         self.model.conv_proj = nn.Conv2d(num_channels, 768, kernel_size=16, stride=16)
         self.model.heads = nn.Linear(768, num_classes)
 
     def forward(self, x):
         return self.model(x)
 
+
 class SwinTransformer(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(SwinTransformer, self).__init__()
-        self.model = swin_t(weights=None)
+        self.model = swin_t(weights = True)
         self.model.features[0][0] = nn.Conv2d(num_channels, 96, kernel_size=4, stride=4)
         self.model.head = nn.Linear(768, num_classes)
 

@@ -37,7 +37,7 @@ class VisionTransformer(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(VisionTransformer, self).__init__()
         self.model = vit_b_16(weights=True, image_size=224)
-        self.model.conv_proj = nn.Conv2d(num_channels, 768, kernel_size=16, stride=16)
+        # self.model.conv_proj = nn.Conv2d(num_channels, 768, kernel_size=16, stride=16)
         self.model.heads = nn.Linear(768, num_classes)
 
     def forward(self, x):

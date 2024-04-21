@@ -17,6 +17,8 @@ import matplotlib.pyplot as plt
 def train(model, dataloader, criterion, optimizer, device):
     model.train()
     running_loss = 0.0
+    y_true = []
+    y_pred = []
     for inputs, labels in dataloader:
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
@@ -25,8 +27,12 @@ def train(model, dataloader, criterion, optimizer, device):
         loss = criterion(outputs, labels.unsqueeze(1).float())
         loss.backward()
         optimizer.step()
+        preds = torch.round(torch.sigmoid(outputs)).squeeze(1)
+        y_true.extend(labels.cpu().detach().numpy())
+        y_pred.extend(preds.cpu().detach().numpy())
         running_loss += loss.item() * inputs.size(0)
-    return running_loss / len(dataloader.dataset)
+    
+    return running_loss / len(dataloader.dataset), f1_score(y_true, y_pred, zero_division=1)
 
 def evaluate(model, val_loader, test_loader, criterion, device):
     model.eval()
@@ -64,7 +70,7 @@ def _evaluate_set(model, dataloader, criterion, device):
     recall = recall_score(y_true, y_pred, zero_division=1)
     return running_loss / len(dataloader.dataset), accuracy, f1, precision, recall
 
-def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies, val_f1_scores, test_f1_scores,
+def plot_metrics(train_losses, train_f1_scores, val_losses, test_losses, val_accuracies, test_accuracies, val_f1_scores, test_f1_scores,
                  val_precisions, test_precisions, val_recalls, test_recalls, output_dir):
     epochs = range(1, len(train_losses) + 1)
 
@@ -89,6 +95,7 @@ def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_acc
     plt.subplot(2, 3, 3)
     plt.plot(epochs, val_f1_scores, 'r', label='Validation F1 Score')
     plt.plot(epochs, test_f1_scores, 'g', label='Testing F1 Score')
+    plt.plot(epochs, train_f1_scores, 'b', label='Training F1 Score')
     plt.title('Validation and Testing F1 Score')
     plt.xlabel('Epochs')
     plt.ylabel('F1 Score')
@@ -178,6 +185,7 @@ def main(args):
     writer = SummaryWriter(log_dir=tensorboard_dir)
 
     train_losses = []
+    train_f1_scores = []
     val_losses = []
     test_losses = []
     val_accuracies = []
@@ -191,10 +199,11 @@ def main(args):
 
     # Train the model
     for epoch in range(args.epochs):
-        train_loss = train(model, train_loader, criterion, optimizer, device)
+        train_loss, train_f1 = train(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc, val_f1, val_precision, val_recall, test_loss, test_acc, test_f1, test_precision, test_recall = evaluate(model, val_loader, test_loader, criterion, device)
 
         train_losses.append(train_loss)
+        train_f1_scores.append(train_f1)
         val_losses.append(val_loss)
         test_losses.append(test_loss)
         val_accuracies.append(val_acc)
@@ -206,7 +215,7 @@ def main(args):
         val_recalls.append(val_recall)
         test_recalls.append(test_recall)
 
-        print(f"Epoch [{epoch+1}/{args.epochs}], Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Test Loss: {test_loss:.4f}, Val Acc: {val_acc:.4f}, Test Acc: {test_acc:.4f}, Val F1: {val_f1:.4f}, Test F1: {test_f1:.4f}, Val Precision: {val_precision:.4f}, Test Precision: {test_precision:.4f}, Val Recall: {val_recall:.4f}, Test Recall: {test_recall:.4f}")
+        print(f"Epoch [{epoch+1}/{args.epochs}], Train Loss: {train_loss:.4f}, Train F1: {train_f1:.4f}, Val Loss: {val_loss:.4f}, Test Loss: {test_loss:.4f}, Val Acc: {val_acc:.4f}, Test Acc: {test_acc:.4f}, Val F1: {val_f1:.4f}, Test F1: {test_f1:.4f}, Val Precision: {val_precision:.4f}, Test Precision: {test_precision:.4f}, Val Recall: {val_recall:.4f}, Test Recall: {test_recall:.4f}")
 
         # Record metrics in TensorBoard
         writer.add_scalar("Loss/Train", train_loss, epoch)
@@ -227,7 +236,7 @@ def main(args):
             torch.save(model.state_dict(), os.path.join(model_dir, model_name))
 
             # Plot metrics every 10 epochs
-            plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies,
+            plot_metrics(train_losses, train_f1_scores, val_losses, test_losses, val_accuracies, test_accuracies,
                          val_f1_scores, test_f1_scores, val_precisions, test_precisions,
                          val_recalls, test_recalls, run_dir)
 
@@ -236,7 +245,7 @@ def main(args):
     torch.save(model.state_dict(), os.path.join(model_dir, model_name))
 
     # Plot the final metrics
-    plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies,
+    plot_metrics(train_losses, train_f1_scores, val_losses, test_losses, val_accuracies, test_accuracies,
                  val_f1_scores, test_f1_scores, val_precisions, test_precisions,
                  val_recalls, test_recalls, run_dir)
 

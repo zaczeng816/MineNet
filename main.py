@@ -246,10 +246,10 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Satellite Image Classification")
     parser.add_argument("--data_dir", type=str, default="../Data", help="Directory containing the dataset")
-    parser.add_argument("--bands", type=str, default="0,1,2", help="Comma-separated list of bands to use for training")
+    parser.add_argument("--bands", type=str, default="3,2,1", help="Comma-separated list of bands to use for training")
     parser.add_argument("--model", type=str, default="resnet50", help="Model architecture")
     parser.add_argument("--num_classes", type=int, default=1, help="Number of classes")
-    parser.add_argument("--image_size", type=int, default=512, help="Input image size")
+    parser.add_argument("--image_size", type=int, default=224, help="Input image size")
     parser.add_argument("--patch_size", type=int, default=16, help="Patch size for Vision Transformer")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")

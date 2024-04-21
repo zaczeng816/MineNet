@@ -69,7 +69,7 @@ class ConvNeXt(nn.Module):
 class ResNet50(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(ResNet50, self).__init__()
-        self.model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)  # Don't load pre-trained weights
+        self.model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)  
         # self.model.conv1 = nn.Conv2d(num_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, num_classes)

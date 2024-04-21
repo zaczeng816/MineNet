@@ -9,7 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from load_dataset import SatelliteDataset
 from nets import (
     VisionTransformer, SwinTransformer, ConvNeXt, ResNet50, DenseNet121, DenseNet169,
-    DenseNet201, EfficientNetB0, EfficientNetB7,VisionMambaNet
+    DenseNet201, EfficientNetB0, EfficientNetB7
 )
 from sklearn.metrics import f1_score, precision_score, recall_score
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ def train(model, dataloader, criterion, optimizer, device):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs, labels.unsqueeze(1).float())
         loss.backward()
         optimizer.step()
         running_loss += loss.item() * inputs.size(0)
@@ -39,21 +39,25 @@ def _evaluate_set(model, dataloader, criterion, device):
     total = 0
     y_true = []
     y_pred = []
+    pred_list = []
+    output_list = []
     with torch.no_grad():
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels.to(device).unsqueeze(1).float())
             running_loss += loss.item() * inputs.size(0)
-            _, preds = torch.max(outputs, 1)
-            correct += torch.sum(preds == labels.data).item()
+            preds = torch.round(torch.sigmoid(outputs)).squeeze(1)
+            pred_list += preds.int().tolist()
+            output_list += outputs.tolist()
+            correct += (preds == labels).sum().item()
             total += labels.size(0)
             y_true.extend(labels.cpu().numpy())
             y_pred.extend(preds.cpu().numpy())
     accuracy = correct / total if total != 0 else 0.0
-    f1 = f1_score(y_true, y_pred, average='weighted', zero_division=1)
-    precision = precision_score(y_true, y_pred, average='weighted', zero_division=1)
-    recall = recall_score(y_true, y_pred, average='weighted', zero_division=1)
+    f1 = f1_score(y_true, y_pred, zero_division=1)
+    precision = precision_score(y_true, y_pred, zero_division=1)
+    recall = recall_score(y_true, y_pred, zero_division=1)
     return running_loss / len(dataloader.dataset), accuracy, f1, precision, recall
 
 def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_accuracies, val_f1_scores, test_f1_scores,
@@ -105,6 +109,8 @@ def plot_metrics(train_losses, val_losses, test_losses, val_accuracies, test_acc
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, f'metrics_plot_{args.model}.png'))
     plt.close()
+
+
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -145,16 +151,15 @@ def main(args):
         model = EfficientNetB0(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "efficientnet_b7":
         model = EfficientNetB7(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
-    elif args.model == "mamba":
-        model = VisionMambaNet(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
+    # elif args.model == "mamba":
+        # model = VisionMambaNet(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     elif args.model == "vit_l":
         model = VisionTransformer_Large(num_classes=args.num_classes, num_channels=len(args.bands.split(",")))
     else:
         raise ValueError(f"Unsupported model: {args.model}")
     model.to(device)
 
-    class_weights = torch.tensor([2.0, 1.0]).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = nn.BCEWithLogitsLoss()
 
     if args.optimizer == "sgd":
         optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=0.0001)
@@ -236,15 +241,15 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Satellite Image Classification")
-    parser.add_argument("--data_dir", type=str, default="data", help="Directory containing the dataset")
+    parser.add_argument("--data_dir", type=str, default="../Data", help="Directory containing the dataset")
     parser.add_argument("--bands", type=str, default="0,1,2", help="Comma-separated list of bands to use for training")
     parser.add_argument("--model", type=str, default="resnet50", help="Model architecture")
-    parser.add_argument("--num_classes", type=int, default=2, help="Number of classes")
+    parser.add_argument("--num_classes", type=int, default=1, help="Number of classes")
     parser.add_argument("--image_size", type=int, default=512, help="Input image size")
     parser.add_argument("--patch_size", type=int, default=16, help="Patch size for Vision Transformer")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
     parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate")
-    parser.add_argument("--epochs", type=int, default=25, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, default=20, help="Number of epochs")
     parser.add_argument("--optimizer", type=str, default="adam", help="Optimizer to use (sgd, adam, rmsprop)")
     parser.add_argument("--output_dir", type=str, default="results", help="Directory to save the trained models and plots")
     args = parser.parse_args()

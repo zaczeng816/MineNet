@@ -55,13 +55,13 @@ class SatelliteDataset(Dataset):
     def _get_transform(self):
         if self.split == "train":
             transform = transforms.Compose([
-                transforms.Resize((224, 224)),
+                transforms.Resize((224, 224), antialias=True),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip()
             ])
         else:
             transform = transforms.Compose([
-                transforms.Resize((224, 224))
+                transforms.Resize((224, 224), antialias=True)
             ])
         return transform
     def __getitem__(self, index):

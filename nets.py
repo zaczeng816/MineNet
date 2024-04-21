@@ -1,35 +1,35 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, densenet121, densenet169, densenet201, efficientnet_b0, efficientnet_b7, vit_b_16, swin_t, convnext_tiny
+from torchvision.models import resnet50, densenet121, densenet169, densenet201, efficientnet_b0, efficientnet_b7, vit_b_16, swin_t, convnext_tiny, ResNet50_Weights
 import sys
 import os
 
 # Add the parent directory to the system path
-sys.path.append("Vim/vim")
-from models_mamba import VisionMamba, PatchEmbed
+# sys.path.append("Vim/vim")
+# from models_mamba import VisionMamba, PatchEmbed
 
-class VisionMambaNet(nn.Module):
-    def __init__(self, num_classes, num_channels):
-        super(VisionMambaNet, self).__init__()
-        self.model = VisionMamba( num_classes=num_classes,
-            img_size=512,
-            channels=num_channels,
-            patch_size=16, stride=8, embed_dim=384, depth=24,
-            rms_norm=True, residual_in_fp32=True, fused_add_norm=True, final_pool_type='mean', 
-            if_abs_pos_embed=True, if_rope=False, if_rope_residual=False, bimamba_type="v2", if_cls_token=True, if_devide_out=True, use_middle_cls_token=True
-        )
+# class VisionMambaNet(nn.Module):
+#     def __init__(self, num_classes, num_channels):
+#         super(VisionMambaNet, self).__init__()
+#         self.model = VisionMamba( num_classes=num_classes,
+#             img_size=512,
+#             channels=num_channels,
+#             patch_size=16, stride=8, embed_dim=384, depth=24,
+#             rms_norm=True, residual_in_fp32=True, fused_add_norm=True, final_pool_type='mean', 
+#             if_abs_pos_embed=True, if_rope=False, if_rope_residual=False, bimamba_type="v2", if_cls_token=True, if_devide_out=True, use_middle_cls_token=True
+#         )
 
-        self.model.patch_embed.proj = nn.Conv2d(num_channels, 384, kernel_size=16, stride=8)
+#         self.model.patch_embed.proj = nn.Conv2d(num_channels, 384, kernel_size=16, stride=8)
         
-        self.model.head = nn.Sequential(
-            nn.Linear(384, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(0.5),
-            nn.Linear(256, num_classes),
-        )
+#         self.model.head = nn.Sequential(
+#             nn.Linear(384, 256),
+#             nn.ReLU(inplace=True),
+#             nn.Dropout(0.5),
+#             nn.Linear(256, num_classes),
+#         )
 
-    def forward(self, x):
-        return self.model(x)
+#     def forward(self, x):
+#         return self.model(x)
 
 
 

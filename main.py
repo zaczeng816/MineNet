@@ -21,6 +21,7 @@ def train(model, dataloader, criterion, optimizer, device):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
+        # BCE
         loss = criterion(outputs, labels.unsqueeze(1).float())
         loss.backward()
         optimizer.step()
@@ -45,9 +46,12 @@ def _evaluate_set(model, dataloader, criterion, device):
         for inputs, labels in dataloader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
+            # BCE
+            # I also changed num of class to 1
             loss = criterion(outputs, labels.to(device).unsqueeze(1).float())
             running_loss += loss.item() * inputs.size(0)
             preds = torch.round(torch.sigmoid(outputs)).squeeze(1)
+            # BCE
             pred_list += preds.int().tolist()
             output_list += outputs.tolist()
             correct += (preds == labels).sum().item()

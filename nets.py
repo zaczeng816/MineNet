@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, densenet121, densenet169, densenet201, efficientnet_b0, efficientnet_b7, vit_b_16, swin_t, convnext_tiny, ResNet50_Weights
+from torchvision.models import (resnet50, densenet121, densenet169, densenet201, 
+                                efficientnet_b0, efficientnet_b7, vit_b_16, swin_t, convnext_tiny, 
+                                ResNet50_Weights, EfficientNet_B0_Weights, EfficientNet_B7_Weights)
 import sys
 import os
 
@@ -67,7 +69,7 @@ class ConvNeXt(nn.Module):
 class ResNet50(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(ResNet50, self).__init__()
-        self.model = resnet50(weights=None)  # Don't load pre-trained weights
+        self.model = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)  # Don't load pre-trained weights
         self.model.conv1 = nn.Conv2d(num_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, num_classes)
@@ -112,8 +114,8 @@ class DenseNet201(nn.Module):
 class EfficientNetB0(nn.Module):
     def __init__(self, num_classes, num_channels):
         super(EfficientNetB0, self).__init__()
-        self.model = efficientnet_b0(weights=None)
-        self.model.features[0][0] = nn.Conv2d(num_channels, 32, kernel_size=3, stride=2, padding=1, bias=False)
+        self.model = efficientnet_b0(weights=EfficientNet_B0_Weights.IMAGENET1K_V1)
+        # self.model.features[0][0] = nn.Conv2d(num_channels, 32, kernel_size=3, stride=2, padding=1, bias=False)
         num_ftrs = self.model.classifier[1].in_features
         self.model.classifier[1] = nn.Linear(num_ftrs, num_classes)
 
@@ -124,8 +126,8 @@ class EfficientNetB7(nn.Module):
     # out of memory error
     def __init__(self, num_classes, num_channels):
         super(EfficientNetB7, self).__init__()
-        self.model = efficientnet_b7(weights=None)
-        self.model.features[0][0] = nn.Conv2d(num_channels, 64, kernel_size=3, stride=2, padding=1, bias=False)
+        self.model = efficientnet_b7(weights=EfficientNet_B7_Weights.IMAGENET1K_V1)
+        # self.model.features[0][0] = nn.Conv2d(num_channels, 64, kernel_size=3, stride=2, padding=1, bias=False)
         num_ftrs = self.model.classifier[1].in_features
         self.model.classifier[1] = nn.Linear(num_ftrs, num_classes)
 
